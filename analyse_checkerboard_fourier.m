@@ -3,8 +3,8 @@ clear all
 %% Define directories and files; change this section for every experiment
 
 rootdir  = 'C:\Users\2018_Group_a\Desktop\yulin\intrinsic\';
-fname = '20190207_172114';  
-direction = 'L2R' ; %{'B2U', 'U2B', 'L2R' 'R2L'}
+fname = '20190207_173031';  
+direction = 'R2L' ; %{'B2U', 'U2B', 'L2R' 'R2L'}
 
 fname_BV = '';
 fname_CAM = '';
@@ -211,7 +211,7 @@ for trialNo=1:length(PAllTrials_dFoverF)
     PAveraged_dFoverF(trialNo,:,:,:)=PAllTrials_dFoverF{trialNo}(:,:,(1:min_nfr));
 end
 %PAveraged=squeeze(nanmean(PAveraged,1));
-PAveraged_dFoverF=squeeze(mean(PAveraged_dFoverF,1), 'omitnan');
+PAveraged_dFoverF=squeeze(mean(PAveraged_dFoverF,1, 'omitnan'));
 
 
 %clear PAllTrials % large cell array of movies, not used anymore

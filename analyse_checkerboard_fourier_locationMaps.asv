@@ -50,7 +50,7 @@ altitude_locationMap = mean(cat(3, locationMaps{1:2}), 3);
 % imwrite(altitude_locationMap, sprintf('%saltitude_locationMap.tif',savedir));
 
 saveVariableList = [azimuth_powerMap, azimuth_locationMap, altitude_powerMap, altitude_locationMap];
-savefnameList = [strcat(savedir, "azimuth_powerMap.tif"), strcat(savedir, "azimuth_locationMap.tif"), strcat(savedir, "altitude_powerMap.tif"), strcat(savedir, "altitude_locationMap.tif")];
+savefnameList = [sprintf('%sazimuth_powerMap.tif',savedir), sprintf('%sazimuth_locationMap.tif',savedir), sprintf('%saltitude_powerMap.tif',savedir), sprintf('%saltitude_locationMap.tif',savedir)];
 
 tagstruct.ImageLength = size(azimuth_powerMap,1);
 tagstruct.ImageWidth = size(azimuth_powerMap,2);
@@ -65,7 +65,7 @@ for i = 1:length(savefnameList)
         saveVar = saveVariableList(i);
         savefName = savefnameList(i);
         
-        t = Tiff(char(savefName),'w');
+        t = Tiff(savefName,'w');
         setTag(t,tagstruct);
         
         write(t, saveVar);

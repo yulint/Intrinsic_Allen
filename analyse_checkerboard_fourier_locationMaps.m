@@ -49,6 +49,31 @@ imwrite(azimuth_locationMap, sprintf('%sazimuth_locationMap.tif',savedir));
 imwrite(altitude_powerMap, sprintf('%saltitude_powerMap.tif',savedir));
 imwrite(altitude_locationMap, sprintf('%saltitude_locationMap.tif',savedir));
 
+saveVariableList = ["azimuth_powerMap", "azimuth_locationMap", "altitude_powerMap", "altitude_locationMap"]
+savefnameList = [sprintf('%sazimuth_powerMap.tif',savedir), sprintf('%sazimuth_locationMap.tif',savedir), sprintf('%saltitude_powerMap.tif',savedir), sprintf('%saltitude_locationMap.tif',savedir)]
+
+tagstruct.ImageLength = size(azimuth_powerMap,1);
+tagstruct.ImageWidth = size(azimuth_powerMap,2);
+tagstruct.Photometric = Tiff.Photometric.MinIsBlack;
+tagstruct.BitsPerSample = 64;
+tagstruct.SampleFormat = Tiff.SampleFormat.IEEEFP; 
+tagstruct.SamplesPerPixel = 1;
+tagstruct.Compression = Tiff.Compression.None;
+tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+
+for i in length(saveFileList)
+        saveVar = saveVariableList(i)
+        savefName = savefnameList(i)
+        
+        t = Tiff(savefName,'w');
+        setTag(t,tagstruct);
+        
+        write(t, saveVar);
+        close(t);
+end
+
+
+
 figure; imagesc(azimuth_locationMap, 'AlphaData', ~isnan(azimuth_locationMap)); 
 set(gca,'color',[1 1 1]);
 colormap(jet); colorbar; axis square

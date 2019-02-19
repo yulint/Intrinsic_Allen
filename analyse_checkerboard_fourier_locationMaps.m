@@ -38,19 +38,15 @@ for i = 1:length(directionList)
         end
 end
 
-azimuth_powerMap = mean(cat(3, powerMaps{3:4}), 3);
-azimuth_locationMap = mean(cat(3, locationMaps{3:4}), 3);
+saveVariableList = {mean(cat(3, powerMaps{3:4}), 3); %azimuth_powerMap
+                    mean(cat(3, locationMaps{3:4}), 3); %azimuth_locationMap
+                    mean(cat(3, powerMaps{1:2}), 3); %altitude_powerMap
+                    mean(cat(3, locationMaps{1:2}), 3)}; %altitude_locationMap
 
-altitude_powerMap = mean(cat(3, powerMaps{1:2}), 3);
-altitude_locationMap = mean(cat(3, locationMaps{1:2}), 3);
-
-% imwrite(azimuth_powerMap, sprintf('%sazimuth_powerMap.tif',savedir));
-% imwrite(azimuth_locationMap, sprintf('%sazimuth_locationMap.tif',savedir));
-% imwrite(altitude_powerMap, sprintf('%saltitude_powerMap.tif',savedir));
-% imwrite(altitude_locationMap, sprintf('%saltitude_locationMap.tif',savedir));
-
-saveVariableList = [azimuth_powerMap, azimuth_locationMap, altitude_powerMap, altitude_locationMap];
-savefnameList = [strcat(savedir, "azimuth_powerMap.tif"), strcat(savedir, "azimuth_locationMap.tif"), strcat(savedir, "altitude_powerMap.tif"), strcat(savedir, "altitude_locationMap.tif")];
+savefnameList = [strcat(savedir, "azimuth_powerMap.tif"), 
+                 strcat(savedir, "azimuth_locationMap.tif"), 
+                 strcat(savedir, "altitude_powerMap.tif"), 
+                 strcat(savedir, "altitude_locationMap.tif")];
 
 tagstruct.ImageLength = size(azimuth_powerMap,1);
 tagstruct.ImageWidth = size(azimuth_powerMap,2);
@@ -62,7 +58,7 @@ tagstruct.Compression = Tiff.Compression.None;
 tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
 
 for i = 1:length(savefnameList)
-        saveVar = saveVariableList(i);
+        saveVar = cell2mat(saveVariableList(i));
         savefName = savefnameList(i);
         
         t = Tiff(char(savefName),'w');

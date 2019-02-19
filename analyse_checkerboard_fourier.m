@@ -2,15 +2,15 @@ clear all
 %--------------------------------------------------------------------------
 %% Define directories and files; change this section for every experiment
 
-rootdir  = 'C:\Users\2018_Group_a\Desktop\yulin\';
+rootdir  = 'C:\Users\2018_Group_a\Desktop\yulin\intrinsic\';
+fname = '20190207_172114';  
+direction = 'L2R' ; %{'B2U', 'U2B', 'L2R' 'R2L'}
+
 fname_BV = '';
-
-fname = '20190207_172722';  
-savedir =  fullfile(rootdir, 'analysis_Allen\'); 
-
 fname_CAM = '';
 fname_trigger = '';
 
+savedir =  fullfile(rootdir, 'analysis_Allen\'); 
 cursavedir = [savedir,fname,'\'];
 if ~isdir(cursavedir), mkdir(cursavedir); end
 %%
@@ -54,14 +54,14 @@ if isempty(fname_CAM)
 
     fclose(fid);
 
-    save(sprintf('%sCAM',cursavedir),'CAM');
+    save(sprintf('%s%s_CAM',cursavedir,fname),'CAM');
 
 else
-    load(sprintf('%sCAM',cursavedir));
+    CAM = load(sprintf('%s%s_CAM',cursavedir,fname'));
 end 
 
-figure;plot(CAM.timestamp);
-figure;plot(CAM.timeifi);
+% figure;plot(CAM.timestamp);
+% figure;plot(CAM.timeifi);
 
 %extract trigger info
 if isempty(fname_trigger)
@@ -89,9 +89,9 @@ if isempty(fname_trigger)
     TTL.trgval = fread(fid,TTL.nfrm,'*uint8',TTL.frmsiz-8/8,'ieee-be');
     
     fclose(fid);
-    save(sprintf('%sSTM',cursavedir),'TTL');
+    save(sprintf('%s%s_TTL',cursavedir,fname),'TTL');
 else
-    load(sprintf('%sSTM',cursavedir));
+    TTL = load(sprintf('%s%s_TTL',cursavedir,fname));
 end 
 
 % check TTL and imaging stamps
@@ -108,8 +108,7 @@ hold on;plot(TTL.i(TTL.trgid==1),0.25,'gx')
 hold on;plot(TTL.i(TTL.trgid==2),double(TTL.trgval(TTL.trgid==2))./10,'gs')
 %%
 
-%temporary version: TTLs recorded at start of cycle and end of checkerboard
-%stimulus
+%temporary version: TTLs recorded at end of baseline and end of cycle
 
 fprintf('%s:%s: reading image\n',fname,datestr(now));
 
@@ -137,32 +136,35 @@ IMG.nf = fread(img_fid,IMG.nfrm,'*int32',IMG.frmsiz-32/8,'ieee-be');
 
 % find peristimulus times  -------------------------------------------
 clear TRIAL;
-TRIAL.trialStarts = TTL.i(TTL.trgid==0);
-TRIAL.stimulusEnds = TTL.i(TTL.trgid==1);
+TRIAL.stimulusStarts = TTL.i(TTL.trgid==0);
+TRIAL.cycleEnds = TTL.i(TTL.trgid==1);
 
-TRIAL.avgTrialLength = double(median(TRIAL.trialStarts(2:2:end) - TRIAL.trialStarts(1:2:end))); % avg # i-s in each trial
-TRIAL.avgPostGap = double(median(TRIAL.trialStarts(2:end)-TRIAL.stimulusEnds(1:end-1)));
-TRIAL.avgPreGap = 3 * 1./median(diff(CAM.timestamp));
+%units here: number of CAM/TTL i-s  
+TRIAL.avgTrialLength = double(median(TRIAL.cycleEnds(2:2:end) - TRIAL.cycleEnds(1:2:end))); % avg # i-s in each trial
+TRIAL.avgPreGap = double(median(TRIAL.stimulusStarts(2:end)-TRIAL.cycleEnds(1:end-1)));
+TRIAL.avgPostGap = 3 * 1./median(diff(CAM.timestamp));
 
+%units here: number of IMG frames
 %find # baseline frames 
-TRIAL.preBaselineTime = 3;
-PSTH.frmrate = 24;
-IMG.avgfrmTime = median(diff(CAM.timestamp(IMG.i))); % time elapsed in average i step of IMG
-PSTH.frmrate = 1./IMG.avgfrmTime; %error occurs when frames droped? (20.10.2014.)
-PSTH.frmpre  = round(TRIAL.preBaselineTime*PSTH.frmrate);
+% TRIAL.preBaselineTime = 3;
+% PSTH.frmrate = 24;
+ IMG.avgfrmTime = median(diff(CAM.timestamp(IMG.i))); % time elapsed in average i step of IMG
+ PSTH.frmrate = 1./IMG.avgfrmTime; %error occurs when frames droped? (20.10.2014.)
+% PSTH.frmpre  = round(TRIAL.preBaselineTime*PSTH.frmrate);
 
 % extract PSTH  -------------------------------------------
 
 fprintf('%s:%s: extracting PSTH\n',fname,datestr(now));
 
 % create cell array of movies ([X Y frames] arrays), one per cycle
-PAllTrials = cell(1,length(TRIAL.trialStarts));
-PAllTrials_dFoverF = cell(1,length(TRIAL.trialStarts));
+PAllTrials = cell(1,length(TRIAL.stimulusStarts));
+PAllTrials_dFoverF = cell(1,length(TRIAL.stimulusStarts));
 
-for trialNo=1:length(TRIAL.trialStarts) 
+for trialNo=1:length(TRIAL.stimulusStarts) 
     fprintf('trial number: %d\n',trialNo);
-    currentTrial = [TRIAL.trialStarts(trialNo),TRIAL.trialStarts(trialNo)+TRIAL.avgTrialLength]; 
-    currentBaselineEnd = TRIAL.trialStarts(trialNo) + PSTH.frmpre;
+    currentTrialStart = TRIAL.stimulusStarts(trialNo) - TRIAL.avgPreGap;
+    currentTrial = [currentTrialStart,currentTrialStart+TRIAL.avgTrialLength]; 
+    currentBaselineEnd = TRIAL.stimulusStarts(trialNo);
 
     % find frame with starttime closest to trigger
     [~,frIx1]=min(abs(double(IMG.i)-double(currentTrial(1))));
@@ -202,21 +204,14 @@ fclose(img_fid);
 
 min_nfr = min(cellfun(@(x) size(x,3) , PAllTrials_dFoverF)); % min_nfr: minimum num frames across the movies
 
-PAveraged=NaN([length(PAllTrials),size(PAllTrials{trialNo},1),size(PAllTrials{trialNo},2),min_nfr]);
+%PAveraged=NaN([length(PAllTrials),size(PAllTrials{trialNo},1),size(PAllTrials{trialNo},2),min_nfr]);
 PAveraged_dFoverF=NaN([length(PAllTrials_dFoverF),size(PAllTrials_dFoverF{trialNo},1),size(PAllTrials_dFoverF{trialNo},2),min_nfr]);
 for trialNo=1:length(PAllTrials_dFoverF)
-    PAveraged(trialNo,:,:,:)=PAllTrials{trialNo}(:,:,(1:min_nfr));
+    %PAveraged(trialNo,:,:,:)=PAllTrials{trialNo}(:,:,(1:min_nfr));
     PAveraged_dFoverF(trialNo,:,:,:)=PAllTrials_dFoverF{trialNo}(:,:,(1:min_nfr));
 end
-PAveraged=squeeze(nanmean(PAveraged,1));
-PAveraged_dFoverF=squeeze(nanmean(PAveraged_dFoverF,1));
-
-% for averaging before taking dFoverF:
-% baselineF =mean(PAveraged(:,:,bslRng),3); 
-% baselineF =repmat(baselineF,[1,1,size(PAveraged,3)]);
-% dF=(PAveraged-baselineF)./baselineF;
-% PAveraged_dFoverF=dF;
-        
+%PAveraged=squeeze(nanmean(PAveraged,1));
+PAveraged_dFoverF=squeeze(mean(PAveraged_dFoverF,1), 'omitnan');
 
 
 %clear PAllTrials % large cell array of movies, not used anymore
@@ -252,8 +247,12 @@ powerMap = abs(powerMovie(:,:,2)');
 phaseMap = 180/pi* mod(angle(fft_firstHarmonicFreq'), 2*pi);
 
 %sanity check
-figure; h = heatmap(phaseMap, "GridVisible", "Off", "Colormap", hsv);
-figure; h = heatmap(powerMap, "GridVisible", "Off", "Colormap", hsv);
+%figure; h = heatmap(phaseMap, "GridVisible", "Off", "Colormap", jet);
+fig_pwr = figure; imagesc(powerMap); colormap(gray); colorbar; axis square
+title(sprintf('Power map_%s_%s', fname, direction),'Interpreter','none');
+powerMap_fname = sprintf('%s%s_%s_powerMap',cursavedir,fname,direction);
+print(fig_pwr, powerMap_fname, '-dtiff');
+
 %%
 %convert phase map to location map
 %relative location in screen, 0 = bottom/ left of screen
@@ -261,13 +260,29 @@ figure; h = heatmap(powerMap, "GridVisible", "Off", "Colormap", hsv);
 TRIAL.visualStimStartPhase = (TRIAL.avgPreGap)/TRIAL.avgTrialLength * 360;
 TRIAL.visualStimEndPhase = (TRIAL.avgTrialLength-TRIAL.avgPostGap)/TRIAL.avgTrialLength * 360;
 
-% locationMap = phaseMap;
-% locationMap(locationMap < TRIAL.visualStimStartPhase | locationMap > TRIAL.visualStimEndPhase) = NaN;
-% 
-% for index = find(locationMap > TRIAL.visualStimStartPhase & locationMap < TRIAL.visualStimEndPhase)
-%     locationMap(index) = (locationMap(index)- TRIAL.visualStimStartPhase)/ (TRIAL.avgTrialLength-TRIAL.avgPreGap-TRIAL.avgPostGap);
-% end
 locationMap = phaseMap;
-locationMap = (locationMap- TRIAL.visualStimStartPhase)/ (TRIAL.avgTrialLength-TRIAL.avgPreGap-TRIAL.avgPostGap);    
+locationMap(locationMap < TRIAL.visualStimStartPhase | locationMap > TRIAL.visualStimEndPhase) = NaN;
 
-figure; h = heatmap(locationMap, "GridVisible", "Off", "Colormap", hsv);
+for index = find(locationMap > TRIAL.visualStimStartPhase & locationMap < TRIAL.visualStimEndPhase)
+    if strcmp(direction, 'B2U') || strcmp(direction, 'L2R')
+        locationMap(index) = (locationMap(index)- TRIAL.visualStimStartPhase)/ (TRIAL.avgTrialLength-TRIAL.avgPreGap-TRIAL.avgPostGap);
+    elseif strcmp(direction, 'U2B') || strcmp(direction, 'R2L')
+        locationMap(index) = 1 - (locationMap(index)- TRIAL.visualStimStartPhase)/ (TRIAL.avgTrialLength-TRIAL.avgPreGap-TRIAL.avgPostGap);
+    end    
+end
+
+% figure; h_location = heatmap(locationMap, "GridVisible", "Off", "Colormap", jet);
+% h_location.Title = sprintf('Location map_%s_%s', fname, direction); 
+
+fig_locMap = figure; imagesc(locationMap, 'AlphaData', ~isnan(locationMap)); 
+set(gca,'color',[1 1 1]);
+colormap(jet); colorbar; axis square
+title(sprintf('Location map_%s_%s', fname, direction),'Interpreter','none');
+locationMap_fname = sprintf('%s%s_%s_locationMap',cursavedir,fname,direction);
+print(fig_locMap, locationMap_fname, '-dtiff');
+
+%%
+save(sprintf('%s%s_%s_fft',savedir,fname,direction),'fft_firstHarmonicFreq')
+save(sprintf('%s%s_%s_powerMap',savedir,fname,direction),'powerMap')
+save(sprintf('%s%s_%s_locationMap',savedir,fname,direction),'locationMap')
+

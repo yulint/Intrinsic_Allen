@@ -1,6 +1,6 @@
 %close all
 
-rootdir  = 'C:\Users\2018_Group_a\Desktop\yulin\intrinsic\GtA18\';
+rootdir  = 'C:\Users\2018_Group_a\Desktop\yulin\intrinsic\GtA17\';
 
 savedir =  fullfile(rootdir, 'analysis_Allen\');
 
@@ -20,7 +20,7 @@ for i = 1:length(directionList)
             temp = cell2mat(struct2cell(load(fname)));
             
             %median filter
-            filterRadius = 1; %note: must be odd
+            filterRadius = 7; %note: must be odd
             temp_padded = padarray(temp, floor([filterRadius/2 filterRadius/2]), 'both'); % Pad image
             temp_paddedCol = im2col(temp_padded, [filterRadius filterRadius], 'sliding'); % Transform into columns
             temp_median = reshape(median(temp_paddedCol, 1, 'omitnan'), size(temp,1), size(temp,2)); % Find median of each column and reshape back
@@ -51,63 +51,57 @@ for i = 1:length(directionList)
 end
 
 
-for i = 1:4
-    
-    filled_locationMaps{i} = locationMaps{i};
-    
-    if mod(i,2) == 1
-        j = i+1;
-    elseif mod(i,2) ==0
-        j = i-1;
-    end
-    
-    nonNans = ~nanMask{i} .* ~nanMask{j};
-    nonNoise = powerMaps_thrMask{i} .* powerMaps_thrMask{j};
-    idxs_to_regress = nonNans .* nonNoise;
-    
-    linear_reg_model = polyfit(squeeze(reshape(locationMaps{j}(idxs_to_regress==1),[],1)),squeeze(reshape(locationMaps{i}(idxs_to_regress==1),[],1)),1);
-    predicted_i_from_j = polyval(linear_reg_model,locationMaps{j});
-    
-    for ii =  find(nanMask{i}==1)
-        filled_locationMaps{i}(ii) = predicted_i_from_j(ii);
-    
-    end
-    
-end    
-
-% figure; imagesc(filled_locationMaps{4}, 'AlphaData', ~isnan(filled_locationMaps{4})); 
-% set(gca,'color',[1 1 1]);
-% colormap(jet); colorbar; axis square
-% title('nan replaced','Interpreter','none');
-% figure; imagesc(filled_locationMaps{3}, 'AlphaData', ~isnan(filled_locationMaps{3})); 
-% set(gca,'color',[1 1 1]);
-% colormap(jet); colorbar; axis square
-% title('nan replaced','Interpreter','none');
-% figure; imagesc(filled_locationMaps{2}, 'AlphaData', ~isnan(filled_locationMaps{2})); 
-% set(gca,'color',[1 1 1]);
-% colormap(jet); colorbar; axis square
-% title('nan replaced','Interpreter','none');
-% figure; imagesc(filled_locationMaps{1}, 'AlphaData', ~isnan(filled_locationMaps{1})); 
-% set(gca,'color',[1 1 1]);
-% colormap(jet); colorbar; axis square
-% title('nan replaced','Interpreter','none');
-
 
 %%
 saveVariableList.azimuth_powerMap = mean(cat(3, powerMaps{3:4}), 3);
-saveVariableList.azimuth_locationMap = mean(cat(3, filled_locationMaps{3:4}), 3);
 saveVariableList.altitude_powerMap = mean(cat(3, powerMaps{1:2}), 3);  
-saveVariableList.altitude_locationMap = mean(cat(3, filled_locationMaps{1:2}), 3);
 
 
+% LocationMaps currently contain: 
+%   (preferred location + delay), normalised to stimulus display time for B2U/ L2R 
+%   (preferred location - delay), normalised to stimulus display time for U2B/ R2L
+% To obtain preferred location without delay, average B2U&U2B / L2R&R2L. 
+%   Underlying math: Let x = preferred loc, d = delay and S = stimulus display,
+%   (x + d)modS + (x-d)modS = (x + d + x - d)modS = (2x)modS
+%   (x)modS = ( (x + d)modS + (x-d)modS )/2 
+%       i.e. avg(B2U, U2B) or avg(L2R, R2L) 
 
+saveVariableList.azimuth_locationMap = mean(cat(3, locationMaps{3:4}), 3);
+saveVariableList.altitude_locationMap = mean(cat(3, locationMaps{1:2}), 3);
+%%
 saveVariableList.azimuth_locationMap(saveVariableList.azimuth_locationMap < 0 | saveVariableList.azimuth_locationMap > 1) = NaN;
 saveVariableList.altitude_locationMap(saveVariableList.altitude_locationMap < 0 | saveVariableList.altitude_locationMap > 1) = NaN;
+%%
+figure; imagesc(saveVariableList.azimuth_powerMap, 'AlphaData', ~isnan(saveVariableList.azimuth_powerMap)); 
+set(gca,'color',[1 1 1]);
+colormap(gray); colorbar; axis square
+title('Azimuth power map','Interpreter','none');
+
+figure; imagesc(saveVariableList.altitude_powerMap, 'AlphaData', ~isnan(saveVariableList.altitude_powerMap)); 
+set(gca,'color',[1 1 1]);
+colormap(gray); colorbar; axis square
+title('Altitude power map','Interpreter','none');
+
+fig_alt = figure; imagesc(saveVariableList.altitude_locationMap, 'AlphaData', ~isnan(saveVariableList.altitude_locationMap)); 
+set(gca,'color',[1 1 1]);
+colormap(jet); colorbar; axis square
+title('Altitude location map','Interpreter','none');
+altitude_locationMap_fname = sprintf('%saltitude_locationFig',savedir);
+print(fig_alt, altitude_locationMap_fname, '-dtiff');
     
+fig_azi = figure; imagesc(saveVariableList.azimuth_locationMap, 'AlphaData', ~isnan(saveVariableList.azimuth_locationMap)); 
+set(gca,'color',[1 1 1]);
+colormap(jet); colorbar; axis square
+title('Azimuth location map','Interpreter','none');
+azimuth_locationMap_fname = sprintf('%sazimuth_locationFig',savedir);
+print(fig_azi, azimuth_locationMap_fname, '-dtiff');
+
+
+%%  
     
 savefnameList = [strcat(savedir, "azimuth_powerMap.tif"), 
-                 strcat(savedir, "azimuth_locationMap.tif"), 
                  strcat(savedir, "altitude_powerMap.tif"), 
+                 strcat(savedir, "azimuth_locationMap.tif"),
                  strcat(savedir, "altitude_locationMap.tif")];
 
 tagstruct.ImageLength = size(saveVariableList.azimuth_powerMap,1);
@@ -133,22 +127,3 @@ end
 
 
 
-figure; imagesc(saveVariableList.azimuth_locationMap, 'AlphaData', ~isnan(saveVariableList.azimuth_locationMap)); 
-set(gca,'color',[1 1 1]);
-colormap(jet); colorbar; axis square
-title('Azimuth location map','Interpreter','none');
-
-figure; imagesc(saveVariableList.azimuth_powerMap, 'AlphaData', ~isnan(saveVariableList.azimuth_powerMap)); 
-set(gca,'color',[1 1 1]);
-colormap(gray); colorbar; axis square
-title('Azimuth power map','Interpreter','none');
-
-figure; imagesc(saveVariableList.altitude_locationMap, 'AlphaData', ~isnan(saveVariableList.altitude_locationMap)); 
-set(gca,'color',[1 1 1]);
-colormap(jet); colorbar; axis square
-title('Altitude location map','Interpreter','none');
-
-figure; imagesc(saveVariableList.altitude_powerMap, 'AlphaData', ~isnan(saveVariableList.altitude_powerMap)); 
-set(gca,'color',[1 1 1]);
-colormap(gray); colorbar; axis square
-title('Altitude power map','Interpreter','none');

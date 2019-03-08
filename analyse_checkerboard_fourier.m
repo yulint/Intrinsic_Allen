@@ -32,6 +32,10 @@ directionList = {'B2U', 'U2B', 'L2R', 'R2L'};
 % fnameList = {'20190227_181518','20190227_182107','20190227_182835','20190227_183613'};  
 % directionList = {'B2U', 'U2B', 'L2R', 'R2L'};
 
+rootdir  = 'G:\YuLin\ChR2_869661\';
+fnameList = {'20190308_103807','20190308_104045', '20190308_105106', '20190308_105525'};  
+directionList = {'B2U', 'U2B', 'L2R', 'R2L'};
+
 fname_BV = '';
 fname_CAM = '';
 fname_trigger = '';
@@ -171,16 +175,18 @@ for fileNo = 1:length(fnameList)
     clear TRIAL;
     
     %TTLs recorded at cycle starts and stimulusStarts
-    TRIAL.cycleStarts = double(TTL.i(TTL.trgid==0)); 
-    TRIAL.stimulusEnds = double(TTL.i(TTL.trgid==1));
+    TRIAL.cycleStartEnds = double(TTL.i(TTL.trgid==0)); 
+    TRIAL.stimulusStartEnds = double(TTL.i(TTL.trgid==1));
+    TRIAL.stimulusStarts = TRIAL.stimulusStartEnds(1:2:end);   
+    TRIAL.stimulusEnds = TRIAL.stimulusStartEnds(2:2:end);
 %     TRIAL.cycleStarts = TRIAL.cycleStarts(1:10); 
 %     TRIAL.stimulusEnds = TRIAL.stimulusEnds(2:2:end);
 
     %units here: number of CAM/TTL i-s  
-    TRIAL.avgTrialLength = double(median(TRIAL.cycleStarts(2:2:end) - TRIAL.cycleStarts(1:2:end))); % avg # i-s in each trial
-    TRIAL.avgPostGap = double(median(TRIAL.cycleStarts(2:end)-TRIAL.stimulusEnds(1:end-1)));
-    TRIAL.avgPreGap = 3 * 1./median(diff(CAM.timestamp));
-    TRIAL.avgStimDur = double(median(TRIAL.stimulusEnds-TRIAL.cycleStarts))-TRIAL.avgPreGap;
+    TRIAL.avgTrialLength = median(TRIAL.cycleStartEnds(2:2:end-1) - TRIAL.cycleStartEnds(1:2:end-1)); % avg # i-s in each trial
+    TRIAL.avgPostGap = median(TRIAL.cycleStartEnds(2:end)-TRIAL.stimulusEnds);
+    TRIAL.avgPreGap = median(TRIAL.stimulusStarts - TRIAL.cycleStartEnds(1:end-1));
+    TRIAL.avgStimDur = TRIAL.avgTrialLength-TRIAL.avgPreGap-TRIAL.avgPostGap;
     
     %units here: number of IMG frames
     %find # baseline frames 
@@ -196,13 +202,13 @@ for fileNo = 1:length(fnameList)
 
     % create cell array of movies ([X Y frames] arrays), one per cycle
     %PAllTrials = cell(1,length(TRIAL.cycleStarts));
-    PAllTrials_dFoverF = cell(1,length(TRIAL.cycleStarts));
+    PAllTrials_dFoverF = cell(1,length(TRIAL.stimulusStarts));
 
-    for trialNo=1:length(TRIAL.cycleStarts) 
+    for trialNo=1:length(TRIAL.stimulusStarts) 
         fprintf('trial number: %d\n',trialNo);
-        currentTrialStart = TRIAL.cycleStarts(trialNo);
+        currentTrialStart = TRIAL.cycleStartEnds(trialNo);
         currentTrial = [currentTrialStart,currentTrialStart+TRIAL.avgTrialLength]; 
-        currentBaselineEnd = TRIAL.cycleStarts(trialNo)+TRIAL.avgPreGap;
+        currentBaselineEnd = currentTrialStart+TRIAL.avgPreGap;
 
         % find frame with starttime closest to trigger
         [~,frIx1]=min(abs(double(IMG.i)-double(currentTrial(1))));
@@ -248,7 +254,7 @@ for fileNo = 1:length(fnameList)
         PAveraged_dFoverF(trialNo,:,:,:)=PAllTrials_dFoverF{trialNo}(:,:,(1:min_nfr));
     end
     %PAveraged=squeeze(nanmean(PAveraged,1));
-    PAveraged_dFoverF=squeeze(mean(PAveraged_dFoverF,1, 'omitnan'));
+    PAveraged_dFoverF=squeeze(mean(PAveraged_dFoverF,1));
     
     clear PAllTrials_dFoverF
 
@@ -306,7 +312,7 @@ for fileNo = 1:length(fnameList)
     
     locationMap = phaseMap;
 
-    if strcmp(direction, 'B2U') || strcmp(direction, 'L2R')
+    if strcmp(direction, 'B2U') || strcmp(direction, 'L2R') 
         locationMap = (locationMap- TRIAL.visualStimStartPhase)/ (TRIAL.avgStimDurPhase);
     elseif strcmp(direction, 'U2B') || strcmp(direction, 'R2L')
         locationMap = 1 - (locationMap - TRIAL.visualStimStartPhase)/ (TRIAL.avgStimDurPhase);

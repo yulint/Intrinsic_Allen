@@ -1,17 +1,17 @@
 %close all
 
-rootdir  = 'C:\Users\2018_Group_a\Desktop\yulin\intrinsic\GtA17\';
+rootdir  = 'G:\YuLin\ChR2_869661\';
 
 savedir =  fullfile(rootdir, 'analysis_Allen\');
 
-directionList = ["B2U", "U2B", "L2R", "R2L"];
+directionList = {'B2U', 'U2B', 'L2R', 'R2L'};
 
 powerMaps = {};
 locationMaps = {};
 nanMask = {};
 
 for i = 1:length(directionList)
-        direction = directionList(i); 
+        direction = directionList{i}; 
         
         fileList = dir(fullfile(savedir, sprintf('*%s*powerMap.mat', direction)));
 
@@ -20,10 +20,10 @@ for i = 1:length(directionList)
             temp = cell2mat(struct2cell(load(fname)));
             
             %median filter
-            filterRadius = 7; %note: must be odd
+            filterRadius = 5; %note: must be odd
             temp_padded = padarray(temp, floor([filterRadius/2 filterRadius/2]), 'both'); % Pad image
             temp_paddedCol = im2col(temp_padded, [filterRadius filterRadius], 'sliding'); % Transform into columns
-            temp_median = reshape(median(temp_paddedCol, 1, 'omitnan'), size(temp,1), size(temp,2)); % Find median of each column and reshape back
+            temp_median = reshape(median(temp_paddedCol, 1), size(temp,1), size(temp,2)); % Find median of each column and reshape back
             
             powerMaps{i} = temp_median; 
             
@@ -42,7 +42,7 @@ for i = 1:length(directionList)
             nans = isnan(temp);
             temp_padded = padarray(temp, floor([filterRadius/2 filterRadius/2]), 'both'); % Pad image
             temp_paddedCol = im2col(temp_padded, [filterRadius filterRadius], 'sliding'); % Transform into columns
-            temp_median = reshape(median(temp_paddedCol, 1, 'omitnan'), size(temp,1), size(temp,2)); % Find median of each column and reshape back
+            temp_median = reshape(median(temp_paddedCol, 1), size(temp,1), size(temp,2)); % Find median of each column and reshape back
             temp_median(nans) = nan; % Set nan elements back
             
             locationMaps{i} = temp_median; 
@@ -99,10 +99,10 @@ print(fig_azi, azimuth_locationMap_fname, '-dtiff');
 
 %%  
     
-savefnameList = [strcat(savedir, "azimuth_powerMap.tif"), 
-                 strcat(savedir, "altitude_powerMap.tif"), 
-                 strcat(savedir, "azimuth_locationMap.tif"),
-                 strcat(savedir, "altitude_locationMap.tif")];
+savefnameList = {'azimuth_powerMap.tif',
+                 'altitude_powerMap.tif', 
+                 'azimuth_locationMap.tif',
+                 'altitude_locationMap.tif'};
 
 tagstruct.ImageLength = size(saveVariableList.azimuth_powerMap,1);
 tagstruct.ImageWidth = size(saveVariableList.azimuth_powerMap,2);
@@ -116,7 +116,8 @@ tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
 saveVariableListCell = struct2cell(saveVariableList);
 for i = 1:length(savefnameList)
         saveVar = cell2mat(saveVariableListCell(i));
-        savefName = savefnameList(i);
+        savefName = sprintf('%s%s',savedir,savefnameList{i});
+
         
         t = Tiff(char(savefName),'w');
         setTag(t,tagstruct);
